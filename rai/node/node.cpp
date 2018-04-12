@@ -338,7 +338,6 @@ public:
 		}
 		++node.network.incoming.publish;
 		node.peers.contacted (sender, message_a.version_using);
-		node.peers.insert (sender, message_a.version_using);
 		node.process_active (message_a.block);
 	}
 	void confirm_req (rai::confirm_req const & message_a) override
@@ -349,7 +348,6 @@ public:
 		}
 		++node.network.incoming.confirm_req;
 		node.peers.contacted (sender, message_a.version_using);
-		node.peers.insert (sender, message_a.version_using);
 		node.process_active (message_a.block);
 		rai::transaction transaction_a (node.store.environment, nullptr, false);
 		if (node.store.block_exists (transaction_a, message_a.block->hash ()))
@@ -365,7 +363,6 @@ public:
 		}
 		++node.network.incoming.confirm_ack;
 		node.peers.contacted (sender, message_a.version_using);
-		node.peers.insert (sender, message_a.version_using);
 		node.process_active (message_a.vote->block);
 		auto vote (node.vote_processor.vote (message_a.vote, sender));
 		if (vote.code == rai::vote_code::replay)
@@ -2837,13 +2834,16 @@ disconnect_observer ([]() {})
 
 void rai::peer_container::contacted (rai::endpoint const & endpoint_a, unsigned version_a)
 {
-	auto endpoint_l (endpoint_a);
-	if (endpoint_l.address ().is_v4 ())
+	if (version_a >= 0x07)
 	{
-		endpoint_l = rai::endpoint (boost::asio::ip::address_v6::v4_mapped (endpoint_l.address ().to_v4 ()), endpoint_l.port ());
+		auto endpoint_l (endpoint_a);
+		if (endpoint_l.address ().is_v4 ())
+		{
+			endpoint_l = rai::endpoint (boost::asio::ip::address_v6::v4_mapped (endpoint_l.address ().to_v4 ()), endpoint_l.port ());
+		}
+		assert (endpoint_l.address ().is_v6 ());
+		insert (endpoint_l, version_a);
 	}
-	assert (endpoint_l.address ().is_v6 ());
-	insert (endpoint_l, version_a);
 }
 
 void rai::network::send_buffer (uint8_t const * data_a, size_t size_a, rai::endpoint const & endpoint_a, std::function<void(boost::system::error_code const &, size_t)> callback_a)
